@@ -332,43 +332,49 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 
 #ifdef OLED_ENABLE
 
-// Helper to convert number to string
+// Helper to convert number to string and write to OLED
 static void render_number(uint16_t num) {
     char buf[8];
+    int i = 0;
+
     if (num == 0) {
-        oled_write_ln("0", false);
-    } else {
-        // Convert number to string (simple implementation)
-        int i = 0;
-        uint16_t n = num;
-        while (n > 0 && i < 7) {
-            buf[i++] = '0' + (n % 10);
-            n /= 10;
-        }
-        buf[i] = '\0';
-
-        // Reverse the string
-        for (int j = 0; j < i / 2; j++) {
-            char tmp = buf[j];
-            buf[j] = buf[i - 1 - j];
-            buf[i - 1 - j] = tmp;
-        }
-
-        oled_write_ln(buf, false);
+        oled_write("0", false);
+        return;
     }
+
+    // Convert number to string (reverse order)
+    uint16_t n = num;
+    while (n > 0 && i < 7) {
+        buf[i++] = '0' + (n % 10);
+        n /= 10;
+    }
+    buf[i] = '\0';
+
+    // Reverse the string in place
+    for (int j = 0; j < i / 2; j++) {
+        char tmp = buf[j];
+        buf[j] = buf[i - 1 - j];
+        buf[i - 1 - j] = tmp;
+    }
+
+    oled_write(buf, false);
 }
 
 bool oled_task_user(void) {
+    // Clear the entire display and reset cursor to top-left
     oled_clear();
+    oled_set_cursor(0, 0);
 
-    // Boot screen
+    // Boot screen - shown until first keypress
     if (first_boot) {
         oled_write_ln("", false);
         oled_write_ln("city-looper", false);
+        oled_write_ln("", false);
+        oled_write_ln("Ready", false);
         return false;
     }
 
-    // Execution screen
+    // Execution screen - shown during GO loop
     if (is_executing) {
         oled_write_ln("Running...", false);
         oled_write_ln("", false);
@@ -385,6 +391,7 @@ bool oled_task_user(void) {
             oled_write_ln("", false);
             oled_write("Rows: ", false);
             render_number(row_param);
+            oled_write_ln("", false);
             break;
 
         case MODE_ROW:
@@ -394,10 +401,12 @@ bool oled_task_user(void) {
                 oled_write_ln("_", false);
             } else {
                 render_number(entry_buffer);
+                oled_write_ln("", false);
             }
             oled_write_ln("", false);
             oled_write("Saved: ", false);
             render_number(row_param);
+            oled_write_ln("", false);
             break;
     }
 
