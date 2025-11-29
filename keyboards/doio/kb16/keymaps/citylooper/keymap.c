@@ -9,7 +9,7 @@
  */
 
 #include QMK_KEYBOARD_H
-#include <string.h>
+#include "matrix.h"
 
 // ============================================================================
 // CONSTANTS
@@ -19,6 +19,10 @@
 #define MAX_ROW_DIGITS 3
 #define MAX_ROW_VALUE 999
 #define LOOP_DELAY_MS 30
+
+// Matrix position of X key (for abort detection during loop)
+#define ABORT_KEY_ROW 3
+#define ABORT_KEY_COL 0
 
 // City names array
 static const char* city_names[NUM_CITIES] = {
@@ -44,7 +48,6 @@ static uint8_t          city_index = 0;         // 0-3 for city selection
 static uint16_t         row_param = 0;          // Saved row count (0-999)
 static uint16_t         entry_buffer = 0;       // Temporary buffer for row entry
 static uint8_t          entry_digits = 0;       // Number of digits entered
-static volatile bool    abort_flag = false;     // Set when X pressed during GO
 static bool             is_executing = false;   // True during GO loop
 static bool             first_boot = true;      // Show boot message on startup
 
@@ -148,16 +151,23 @@ static const char* get_city_name(void) {
 // GO EXECUTION LOGIC
 // ============================================================================
 
+// Check if the X (abort) key is currently pressed by scanning matrix directly
+static bool is_abort_key_pressed(void) {
+    // Scan the matrix to get current state
+    matrix_scan();
+    // Check if the abort key position is active
+    return matrix_is_on(ABORT_KEY_ROW, ABORT_KEY_COL);
+}
+
 static void execute_go(void) {
     is_executing = true;
-    abort_flag = false;
 
     const char* city = get_city_name();
     uint16_t count = row_param;
 
     for (uint16_t i = 0; i < count; i++) {
-        // Check for abort
-        if (abort_flag) {
+        // Check for abort by directly reading the matrix
+        if (is_abort_key_pressed()) {
             break;
         }
 
@@ -167,12 +177,17 @@ static void execute_go(void) {
         // Tap DOWN arrow
         tap_code(KC_DOWN);
 
-        // Small delay between iterations
-        wait_ms(LOOP_DELAY_MS);
+        // Small delay between iterations, but check for abort during wait
+        for (uint8_t w = 0; w < LOOP_DELAY_MS; w++) {
+            wait_ms(1);
+            if (is_abort_key_pressed()) {
+                is_executing = false;
+                return;
+            }
+        }
     }
 
     is_executing = false;
-    abort_flag = false;
 }
 
 // ============================================================================
@@ -185,13 +200,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         first_boot = false;
     }
 
-    // Handle X key specially during execution - sets abort flag
-    if (keycode == CL_CLEAR && record->event.pressed && is_executing) {
-        abort_flag = true;
-        return false;
-    }
-
-    // Block all keys during execution except X (handled above)
+    // Block all keys during execution (abort is handled via direct matrix scan)
     if (is_executing) {
         return false;
     }
@@ -332,18 +341,18 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 
 #ifdef OLED_ENABLE
 
-// Helper to convert number to string and write to OLED
-static void render_number(uint16_t num) {
-    char buf[8];
-    int i = 0;
-
+// Convert number to string (into provided buffer, returns pointer to buffer)
+static char* itoa_simple(uint16_t num, char* buf) {
     if (num == 0) {
-        oled_write("0", false);
-        return;
+        buf[0] = '0';
+        buf[1] = '\0';
+        return buf;
     }
 
-    // Convert number to string (reverse order)
+    int i = 0;
     uint16_t n = num;
+
+    // Build string in reverse
     while (n > 0 && i < 7) {
         buf[i++] = '0' + (n % 10);
         n /= 10;
@@ -357,59 +366,64 @@ static void render_number(uint16_t num) {
         buf[i - 1 - j] = tmp;
     }
 
-    oled_write(buf, false);
+    return buf;
 }
 
-bool oled_task_user(void) {
-    // Clear the entire display and reset cursor to top-left
-    oled_clear();
-    oled_set_cursor(0, 0);
+// Render a complete OLED frame
+static void render_oled_frame(void) {
+    char num_buf[8];
 
     // Boot screen - shown until first keypress
     if (first_boot) {
-        oled_write_ln("", false);
-        oled_write_ln("city-looper", false);
-        oled_write_ln("", false);
-        oled_write_ln("Ready", false);
-        return false;
+        oled_write_ln_P(PSTR(""), false);
+        oled_write_ln_P(PSTR("city-looper"), false);
+        oled_write_ln_P(PSTR(""), false);
+        oled_write_ln_P(PSTR("Ready"), false);
+        return;
     }
 
     // Execution screen - shown during GO loop
     if (is_executing) {
-        oled_write_ln("Running...", false);
-        oled_write_ln("", false);
-        oled_write_ln("Press X", false);
-        oled_write_ln("to stop", false);
-        return false;
+        oled_write_ln_P(PSTR("Running..."), false);
+        oled_write_ln_P(PSTR(""), false);
+        oled_write_ln_P(PSTR("Hold X"), false);
+        oled_write_ln_P(PSTR("to stop"), false);
+        return;
     }
 
     // Mode-specific display
     switch (current_mode) {
         case MODE_CITY:
-            oled_write_ln("City:", false);
+            oled_write_ln_P(PSTR("City:"), false);
             oled_write_ln(get_city_name(), false);
-            oled_write_ln("", false);
-            oled_write("Rows: ", false);
-            render_number(row_param);
-            oled_write_ln("", false);
+            oled_write_ln_P(PSTR(""), false);
+            oled_write_P(PSTR("Rows: "), false);
+            oled_write(itoa_simple(row_param, num_buf), false);
             break;
 
         case MODE_ROW:
-            oled_write_ln("Rows:", false);
+            oled_write_ln_P(PSTR("Enter Rows:"), false);
             // Show entry buffer (what user is typing)
             if (entry_digits == 0) {
-                oled_write_ln("_", false);
+                oled_write_ln_P(PSTR("_"), false);
             } else {
-                render_number(entry_buffer);
-                oled_write_ln("", false);
+                oled_write_ln(itoa_simple(entry_buffer, num_buf), false);
             }
-            oled_write_ln("", false);
-            oled_write("Saved: ", false);
-            render_number(row_param);
-            oled_write_ln("", false);
+            oled_write_ln_P(PSTR(""), false);
+            oled_write_P(PSTR("Saved: "), false);
+            oled_write(itoa_simple(row_param, num_buf), false);
             break;
     }
+}
 
+bool oled_task_user(void) {
+    // Clear the display buffer completely
+    oled_clear();
+
+    // Render our content
+    render_oled_frame();
+
+    // Return false to indicate we handled OLED rendering
     return false;
 }
 
