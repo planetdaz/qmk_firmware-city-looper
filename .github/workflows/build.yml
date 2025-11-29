@@ -1,0 +1,36 @@
+name: Build QMK Firmware
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - city-looper
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install QMK dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3 python3-pip git make gcc dfu-util
+          pip install qmk
+
+      - name: Setup QMK
+        run: |
+          qmk setup -y
+
+      - name: Build Firmware
+        run: |
+          qmk compile -kb doio/kb16/rev2 -km citylooper
+
+      - name: Upload Firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: .build/**/*.bin
+
