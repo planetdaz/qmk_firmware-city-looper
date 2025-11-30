@@ -24,12 +24,20 @@
 #define ABORT_KEY_ROW 3
 #define ABORT_KEY_COL 0
 
-// City names array
+// City names array (used for actual macro output)
 static const char* city_names[NUM_CITIES] = {
     "Dallas",
     "San Antonio",
     "Austin",
     "Houston"
+};
+
+// Short city abbreviations for the OLED (to avoid overflow)
+static const char* city_abbrevs[NUM_CITIES] = {
+    "DFW",   // Dallas
+    "SATX",  // San Antonio
+    "ATX",   // Austin
+    "HOU"    // Houston
 };
 
 // ============================================================================
@@ -145,6 +153,11 @@ static void cycle_city(bool forward) {
 // Get current city name
 static const char* get_city_name(void) {
     return city_names[city_index];
+}
+
+// Get short city abbreviation for OLED
+static const char* get_city_abbrev(void) {
+    return city_abbrevs[city_index];
 }
 
 // ============================================================================
@@ -336,13 +349,13 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 }
 
 // ============================================================================
-// OLED DISPLAY (single-row status line)
+// OLED DISPLAY (two-line, compact status)
 // ============================================================================
 
 #ifdef OLED_ENABLE
 
-// Render a single compact status line on the first row only.
-// This avoids any assumptions about how many text rows the OLED supports.
+// Render a compact status on up to two text rows.
+// We only redraw when something meaningful changes to avoid flicker.
 bool oled_task_user(void) {
     // Track the last rendered state so we only redraw when something changes
     static bool             initialized      = false;
@@ -352,50 +365,89 @@ bool oled_task_user(void) {
     static uint16_t         last_entry_buffer;
     static uint8_t          last_entry_digits;
     static bool             last_is_executing;
+    static bool             last_first_boot;
 
-    if (!initialized ||
-        last_mode != current_mode ||
-        last_city_index != city_index ||
-        last_row_param != row_param ||
-        last_entry_buffer != entry_buffer ||
-        last_entry_digits != entry_digits ||
-        last_is_executing != is_executing) {
+    bool changed = !initialized ||
+                   last_mode != current_mode ||
+                   last_city_index != city_index ||
+                   last_row_param != row_param ||
+                   last_entry_buffer != entry_buffer ||
+                   last_entry_digits != entry_digits ||
+                   last_is_executing != is_executing ||
+                   last_first_boot != first_boot;
 
-        initialized       = true;
-        last_mode         = current_mode;
-        last_city_index   = city_index;
-        last_row_param    = row_param;
-        last_entry_buffer = entry_buffer;
-        last_entry_digits = entry_digits;
-        last_is_executing = is_executing;
+    if (!changed) {
+        return false;
+    }
 
-        // Clear just the first line by overwriting with spaces
+    initialized       = true;
+    last_mode         = current_mode;
+    last_city_index   = city_index;
+    last_row_param    = row_param;
+    last_entry_buffer = entry_buffer;
+    last_entry_digits = entry_digits;
+    last_is_executing = is_executing;
+    last_first_boot   = first_boot;
+
+    // Clear first two lines by overwriting with spaces
+    oled_set_cursor(0, 0);
+    oled_write_P(PSTR("                     "), false); // ~21 spaces
+    oled_set_cursor(0, 1);
+    oled_write_P(PSTR("                     "), false);
+
+    // Boot screen until the first keypress
+    if (first_boot) {
         oled_set_cursor(0, 0);
-        oled_write_P(PSTR("                     " ), false); // ~21 spaces
-        oled_set_cursor(0, 0);
+        oled_write_P(PSTR("city-looper"), false);
+        oled_set_cursor(0, 1);
+        oled_write_P(PSTR("Ready"), false);
+        return false;
+    }
 
-        if (is_executing) {
-            // Example: "Run Dallas x120"
-            oled_write_P(PSTR("Run "), false);
-            oled_write(get_city_name(), false);
-            oled_write_P(PSTR(" x"), false);
+    // Execution screen - shown during GO loop
+    if (is_executing) {
+        oled_set_cursor(0, 0);
+        // Example: "RUN DFW x124"
+        oled_write_P(PSTR("RUN "), false);
+        oled_write(get_city_abbrev(), false);
+        oled_write_P(PSTR(" x"), false);
+        oled_write(get_u16_str(row_param, ' '), false);
+
+        oled_set_cursor(0, 1);
+        oled_write_P(PSTR("Hold X to stop"), false);
+        return false;
+    }
+
+    // Idle screens
+    if (current_mode == MODE_CITY) {
+        // City mode: e.g. "DFW x 124"
+        oled_set_cursor(0, 0);
+        oled_write(get_city_abbrev(), false);
+        oled_write_P(PSTR(" x "), false);
+        oled_write(get_u16_str(row_param, ' '), false);
+
+        oled_set_cursor(0, 1);
+        oled_write_P(PSTR("CITY MODE"), false);
+    } else { // MODE_ROW
+        oled_set_cursor(0, 0);
+        oled_write_P(PSTR("Rows:"), false);
+        if (entry_digits == 0) {
+            oled_write_P(PSTR("_"), false);
+        } else {
+            oled_write(get_u16_str(entry_buffer, ' '), false);
+        }
+
+        oled_set_cursor(0, 1);
+        if (entry_digits > 0) {
+            // User is typing a new value: show clear hint and remind about Enter
+            oled_write_P(PSTR("ENT=save  X=clr"), false);
+        } else if (row_param > 0) {
+            // No digits typed, but a saved value exists
+            oled_write_P(PSTR("Saved: "), false);
             oled_write(get_u16_str(row_param, ' '), false);
-        } else if (current_mode == MODE_CITY) {
-            // Example: "C:Dallas R:120"
-            oled_write_P(PSTR("C:"), false);
-            oled_write(get_city_name(), false);
-            oled_write_P(PSTR(" R:"), false);
-            oled_write(get_u16_str(row_param, ' '), false);
-        } else { // MODE_ROW
-            // Example while editing:  "Rows:_ S:120" or "Rows:45 S:120"
-            oled_write_P(PSTR("Rows:"), false);
-            if (entry_digits == 0) {
-                oled_write_P(PSTR("_"), false);
-            } else {
-                oled_write(get_u16_str(entry_buffer, ' '), false);
-            }
-            oled_write_P(PSTR(" S:"), false);
-            oled_write(get_u16_str(row_param, ' '), false);
+        } else {
+            // Nothing saved yet, nothing being typed
+            oled_write_P(PSTR("ENT=save"), false);
         }
     }
 
