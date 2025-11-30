@@ -369,20 +369,12 @@ static char* itoa_simple(uint16_t num, char* buf) {
     return buf;
 }
 
-// Force clear entire OLED by writing spaces to all positions
-static void force_clear_oled(void) {
-    for (uint8_t i = 0; i < 4; i++) {
-        oled_set_cursor(0, i);
-        oled_write_P(PSTR("                     "), false);  // 21 spaces (max width)
-    }
-    oled_set_cursor(0, 0);
-}
-
 bool oled_task_user(void) {
     char num_buf[8];
 
-    // Force clear by overwriting with spaces
-    force_clear_oled();
+    // Clear display buffer and force immediate render of the cleared state
+    oled_clear();
+    oled_render_dirty(true);
 
     // Boot screen - shown until first keypress
     if (first_boot) {

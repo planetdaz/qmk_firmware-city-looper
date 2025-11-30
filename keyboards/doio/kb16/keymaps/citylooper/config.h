@@ -13,3 +13,8 @@
 #define OLED_TIMEOUT 0              // Never turn off OLED
 #define OLED_BRIGHTNESS 255         // Maximum brightness
 
+// CRITICAL: Throttle OLED updates to prevent display corruption
+// Without this, oled_clear() doesn't work properly because the display
+// isn't finished rendering before the next frame starts
+#define OLED_UPDATE_INTERVAL 50     // Update every 50ms (20 fps)
+
