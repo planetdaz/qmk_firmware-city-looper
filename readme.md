@@ -10,18 +10,92 @@
 
 **Device:** DOIO KB16 / KB16B-01 style 16-key macropad with 3 rotary encoders and OLED display.
 
-**Purpose:** This firmware transforms the DOIO macropad into a specialized controller for:
-- City selection interface
-- Numeric input workflows
-- Loop automation control
-- Visual feedback via OLED display
-- Encoder-driven navigation and value adjustment
+**Purpose:** This firmware transforms the DOIO macropad into a specialized automation controller for repetitive data-entry workflows. It types a selected city name into a text field, then loops through a specified number of rows by pressing Down Arrow and Enter.
 
-**Current Status:** The keymap is a placeholder for build verification. Functional logic will be added incrementally.
+**Current Status:** Fully functional.
 
 ---
 
-## 2. Hardware Summary
+## 2. How the Keymap Works
+
+City Looper has two operating modes: **City Mode** and **Row Mode**. You switch between them using the bottom encoder's button.
+
+### Physical Layout
+
+```
+┌─────┬─────┬─────┬─────┐   ┌───────┐
+│  7  │  8  │  9  │ (X) │   │ENC TOP│  ← Top encoder: unused
+├─────┼─────┼─────┼─────┤   └───────┘
+│  4  │  5  │  6  │(ENT)│   ┌───────┐
+├─────┼─────┼─────┼─────┤   │ENC MID│  ← Middle encoder: unused
+│  1  │  2  │  3  │ GO  │   └───────┘
+├─────┼─────┼─────┼─────┤   ┌───────┐
+│  0  │ --- │ --- │ --- │   │ENC BOT│  ← Bottom encoder: city select / row adjust
+└─────┴─────┴─────┴─────┘   └───────┘
+                                 ↑
+                          Click = toggle mode
+```
+
+### City Mode (default)
+
+**OLED shows:** `DFW x 120` / `CITY MODE`
+
+| Control | Action |
+|---------|--------|
+| **Bottom encoder (rotate)** | Cycle through cities: Dallas (DFW), San Antonio (SATX), Austin (ATX), Houston (HOU) |
+| **Bottom encoder (click)** | Switch to Row Mode |
+| **GO key** | Execute the automation loop |
+| **X key** | (no action in idle) |
+
+### Row Mode
+
+**OLED shows:** `Rows:_` / `ENT=save  X=clr` (while typing)
+
+| Control | Action |
+|---------|--------|
+| **Number keys 0-9** | Type digits to set row count (max 5 digits, max value 65535) |
+| **Bottom encoder (rotate)** | Increment/decrement the entry value by 1 |
+| **Enter key** | Save the entered value and return to City Mode |
+| **X key** | Clear the current entry (start over) |
+| **Bottom encoder (click)** | Switch back to City Mode (without saving) |
+
+### Executing the Macro (GO)
+
+When you press **GO**, the macro runs:
+
+1. Types the full city name (e.g., "Dallas")
+2. Presses Tab
+3. For each row (up to the saved count):
+   - Presses Down Arrow
+   - Presses Enter
+   - Waits 30ms between iterations
+
+**OLED shows:** `RUN DFW x120` / `Hold X to stop`
+
+**To abort:** Hold the **X** key. The macro stops after the current iteration.
+
+### OLED Display Summary
+
+| State | Line 1 | Line 2 |
+|-------|--------|--------|
+| Boot (before first keypress) | `city-looper` | `Ready` |
+| City Mode (idle) | `DFW x 120` | `CITY MODE` |
+| Row Mode (typing) | `Rows:45` | `ENT=save  X=clr` |
+| Row Mode (idle, value saved) | `Rows:_` | `Saved: 120` |
+| Executing | `RUN DFW x120` | `Hold X to stop` |
+
+### City Abbreviations
+
+| Full Name | OLED Abbreviation | Macro Output |
+|-----------|-------------------|--------------|
+| Dallas | DFW | "Dallas" |
+| San Antonio | SATX | "San Antonio" |
+| Austin | ATX | "Austin" |
+| Houston | HOU | "Houston" |
+
+---
+
+## 3. Hardware Summary
 
 | Component | Details |
 |-----------|---------|
@@ -45,7 +119,7 @@ QMK Toolbox will display: `STM32Duino device connected`
 
 ---
 
-## 3. How to Enter Bootloader Mode
+## 4. How to Enter Bootloader Mode
 
 This is critical for flashing firmware. Even if your firmware is completely broken, this method **always works**.
 
@@ -66,7 +140,7 @@ This is critical for flashing firmware. Even if your firmware is completely brok
 
 | Problem | Solution |
 |---------|----------|
-| QMK Toolbox shows "NO DRIVER" | Install WinUSB driver using Zadig (see Section 4) |
+| QMK Toolbox shows "NO DRIVER" | Install WinUSB driver using Zadig (see Section 5) |
 | Device not detected at all | Try a different USB cable (must support data, not just charging) |
 | Device detected but flashing fails | Hold key 0,0 longer before plugging in; ensure Toolbox shows DFU mode |
 | Accidentally flashed bad firmware | No problem—bootloader mode bypasses firmware entirely |
@@ -75,7 +149,7 @@ This is critical for flashing firmware. Even if your firmware is completely brok
 
 ---
 
-## 4. Required Tools (Flashing Only)
+## 5. Required Tools (Flashing Only)
 
 This project is designed so you **never need to build firmware locally**.
 
@@ -116,7 +190,7 @@ You only need to do this once per computer.
 
 ---
 
-## 5. How Firmware Gets Built (GitHub Actions)
+## 6. How Firmware Gets Built (GitHub Actions)
 
 Firmware is compiled automatically in the cloud. You never need to set up a local build environment.
 
@@ -156,7 +230,7 @@ This is the file you flash with QMK Toolbox.
 
 ---
 
-## 6. Flashing Firmware via QMK Toolbox
+## 7. Flashing Firmware via QMK Toolbox
 
 ### Step-by-Step:
 
@@ -192,7 +266,7 @@ This is the file you flash with QMK Toolbox.
 
 ---
 
-## 7. Repository Structure
+## 8. Repository Structure
 
 ```
 qmk_firmware-city-looper/
@@ -230,7 +304,7 @@ The **DOIO KB16B-01** (the version with the B suffix) uses the **KB16 Rev2** def
 
 ---
 
-## 8. Adding or Modifying Firmware
+## 9. Adding or Modifying Firmware
 
 All your custom logic goes in the keymap folder:
 
@@ -301,7 +375,7 @@ MOUSEKEY_ENABLE = yes       # Enable mouse keys
 
 ---
 
-## 9. Notes for Future You
+## 10. Notes for Future You
 
 Hey, future me. You've forgotten all of this. That's okay. Here's what you need to know:
 
@@ -346,7 +420,7 @@ The bootloader is in protected memory. No matter how badly you mess up the firmw
 
 ---
 
-## 10. Links and Resources
+## 11. Links and Resources
 
 | Resource | URL |
 |----------|-----|
@@ -364,4 +438,4 @@ This project is based on QMK Firmware, which is licensed under the GNU General P
 
 ---
 
-*Last updated: November 2024*
+*Last updated: November 2025*

@@ -251,11 +251,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
 
-        // Enter key - save row entry
+        // Enter key - save row entry and return to city mode
         case CL_ENTER:
             if (record->event.pressed) {
                 if (current_mode == MODE_ROW) {
                     save_entry();
+                    current_mode = MODE_CITY;
                 }
             }
             return false;
