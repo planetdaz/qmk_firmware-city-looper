@@ -369,61 +369,66 @@ static char* itoa_simple(uint16_t num, char* buf) {
     return buf;
 }
 
-// Render a complete OLED frame
-static void render_oled_frame(void) {
+// Force clear entire OLED by writing spaces to all positions
+static void force_clear_oled(void) {
+    for (uint8_t i = 0; i < 4; i++) {
+        oled_set_cursor(0, i);
+        oled_write_P(PSTR("                     "), false);  // 21 spaces (max width)
+    }
+    oled_set_cursor(0, 0);
+}
+
+bool oled_task_user(void) {
     char num_buf[8];
+
+    // Force clear by overwriting with spaces
+    force_clear_oled();
 
     // Boot screen - shown until first keypress
     if (first_boot) {
-        oled_write_ln_P(PSTR(""), false);
-        oled_write_ln_P(PSTR("city-looper"), false);
-        oled_write_ln_P(PSTR(""), false);
-        oled_write_ln_P(PSTR("Ready"), false);
-        return;
+        oled_set_cursor(0, 0);
+        oled_write_P(PSTR("city-looper"), false);
+        oled_set_cursor(0, 2);
+        oled_write_P(PSTR("Ready"), false);
+        return false;
     }
 
     // Execution screen - shown during GO loop
     if (is_executing) {
-        oled_write_ln_P(PSTR("Running..."), false);
-        oled_write_ln_P(PSTR(""), false);
-        oled_write_ln_P(PSTR("Hold X"), false);
-        oled_write_ln_P(PSTR("to stop"), false);
-        return;
+        oled_set_cursor(0, 0);
+        oled_write_P(PSTR("Running..."), false);
+        oled_set_cursor(0, 2);
+        oled_write_P(PSTR("Hold X to stop"), false);
+        return false;
     }
 
     // Mode-specific display
     switch (current_mode) {
         case MODE_CITY:
-            oled_write_ln_P(PSTR("City:"), false);
-            oled_write_ln(get_city_name(), false);
-            oled_write_ln_P(PSTR(""), false);
+            oled_set_cursor(0, 0);
+            oled_write_P(PSTR("City:"), false);
+            oled_set_cursor(0, 1);
+            oled_write(get_city_name(), false);
+            oled_set_cursor(0, 3);
             oled_write_P(PSTR("Rows: "), false);
             oled_write(itoa_simple(row_param, num_buf), false);
             break;
 
         case MODE_ROW:
-            oled_write_ln_P(PSTR("Enter Rows:"), false);
-            // Show entry buffer (what user is typing)
+            oled_set_cursor(0, 0);
+            oled_write_P(PSTR("Rows:"), false);
+            oled_set_cursor(0, 1);
             if (entry_digits == 0) {
-                oled_write_ln_P(PSTR("_"), false);
+                oled_write_P(PSTR("_"), false);
             } else {
-                oled_write_ln(itoa_simple(entry_buffer, num_buf), false);
+                oled_write(itoa_simple(entry_buffer, num_buf), false);
             }
-            oled_write_ln_P(PSTR(""), false);
+            oled_set_cursor(0, 3);
             oled_write_P(PSTR("Saved: "), false);
             oled_write(itoa_simple(row_param, num_buf), false);
             break;
     }
-}
 
-bool oled_task_user(void) {
-    // Clear the display buffer completely
-    oled_clear();
-
-    // Render our content
-    render_oled_frame();
-
-    // Return false to indicate we handled OLED rendering
     return false;
 }
 
