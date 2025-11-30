@@ -23,17 +23,18 @@ City Looper has two operating modes: **City Mode** and **Row Mode**. You switch 
 ### Physical Layout
 
 ```
-┌─────┬─────┬─────┬─────┐   ┌───────┐
-│  7  │  8  │  9  │ (X) │   │ENC TOP│  ← Top encoder: unused
-├─────┼─────┼─────┼─────┤   └───────┘
-│  4  │  5  │  6  │(ENT)│   ┌───────┐
-├─────┼─────┼─────┼─────┤   │ENC MID│  ← Middle encoder: unused
-│  1  │  2  │  3  │ GO  │   └───────┘
-├─────┼─────┼─────┼─────┤   ┌───────┐
-│  0  │ --- │ --- │ --- │   │ENC BOT│  ← Bottom encoder: city select / row adjust
-└─────┴─────┴─────┴─────┘   └───────┘
-                                 ↑
-                          Click = toggle mode
+┌─────┬─────┬─────┬─────┐   ┌───────┐ ┌───────┐
+│  7  │  8  │  9  │ CTY │   │ENC TOP│ │ENC MID│  ← Top/Mid encoders: unused
+├─────┼─────┼─────┼─────┤   └───────┘ └───────┘
+│  4  │  5  │  6  │  #  │
+├─────┼─────┼─────┼─────┤              ┌───────┐
+│  1  │  2  │  3  │ --- │              │ENC BOT│  ← Bottom encoder
+├─────┼─────┼─────┼─────┤              └───────┘
+│  X  │  0  │ ENT │ GO  │                  ↑
+└─────┴─────┴─────┴─────┘           City/Row adjust
+                                    Click = toggle mode
+
+CTY = switch to City Mode    # = switch to Row Mode
 ```
 
 ### City Mode (default)
