@@ -175,6 +175,12 @@ static bool is_abort_key_pressed(void) {
 static void execute_go(void) {
     is_executing = true;
 
+#ifdef OLED_ENABLE
+    // Show running status immediately on the OLED, even while the tight loop runs.
+    oled_task_user();
+    oled_render_dirty(true);
+#endif
+
     const char* city = get_city_name();
     uint16_t count = row_param;
 
