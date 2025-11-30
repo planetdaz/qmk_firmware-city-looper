@@ -53,7 +53,7 @@ City Looper has two operating modes: **City Mode** and **Row Mode**. You switch 
 
 | Control | Action |
 |---------|--------|
-| **Number keys 0-9** | Type digits to set row count (max 5 digits, max value 65535) |
+| **Number keys 0-9** | Type digits to set row count (max 3 digits, max value 999) |
 | **Bottom encoder (rotate)** | Increment/decrement the entry value by 1 |
 | **Enter key** | Save the entered value and return to City Mode |
 | **X key** | Clear the current entry (start over) |
