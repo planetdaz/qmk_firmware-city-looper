@@ -336,89 +336,67 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 }
 
 // ============================================================================
-// OLED DISPLAY
+// OLED DISPLAY (single-row status line)
 // ============================================================================
 
 #ifdef OLED_ENABLE
 
-// Convert number to string (into provided buffer, returns pointer to buffer)
-static char* itoa_simple(uint16_t num, char* buf) {
-    if (num == 0) {
-        buf[0] = '0';
-        buf[1] = '\0';
-        return buf;
-    }
-
-    int i = 0;
-    uint16_t n = num;
-
-    // Build string in reverse
-    while (n > 0 && i < 7) {
-        buf[i++] = '0' + (n % 10);
-        n /= 10;
-    }
-    buf[i] = '\0';
-
-    // Reverse the string in place
-    for (int j = 0; j < i / 2; j++) {
-        char tmp = buf[j];
-        buf[j] = buf[i - 1 - j];
-        buf[i - 1 - j] = tmp;
-    }
-
-    return buf;
-}
-
+// Render a single compact status line on the first row only.
+// This avoids any assumptions about how many text rows the OLED supports.
 bool oled_task_user(void) {
-    char num_buf[8];
+    // Track the last rendered state so we only redraw when something changes
+    static bool             initialized      = false;
+    static operating_mode_t last_mode;
+    static uint8_t          last_city_index;
+    static uint16_t         last_row_param;
+    static uint16_t         last_entry_buffer;
+    static uint8_t          last_entry_digits;
+    static bool             last_is_executing;
 
-    // Clear display buffer and force immediate render of the cleared state
-    oled_clear();
-    oled_render_dirty(true);
+    if (!initialized ||
+        last_mode != current_mode ||
+        last_city_index != city_index ||
+        last_row_param != row_param ||
+        last_entry_buffer != entry_buffer ||
+        last_entry_digits != entry_digits ||
+        last_is_executing != is_executing) {
 
-    // Boot screen - shown until first keypress
-    if (first_boot) {
+        initialized       = true;
+        last_mode         = current_mode;
+        last_city_index   = city_index;
+        last_row_param    = row_param;
+        last_entry_buffer = entry_buffer;
+        last_entry_digits = entry_digits;
+        last_is_executing = is_executing;
+
+        // Clear just the first line by overwriting with spaces
         oled_set_cursor(0, 0);
-        oled_write_P(PSTR("city-looper"), false);
-        oled_set_cursor(0, 2);
-        oled_write_P(PSTR("Ready"), false);
-        return false;
-    }
-
-    // Execution screen - shown during GO loop
-    if (is_executing) {
+        oled_write_P(PSTR("                     " ), false); // ~21 spaces
         oled_set_cursor(0, 0);
-        oled_write_P(PSTR("Running..."), false);
-        oled_set_cursor(0, 2);
-        oled_write_P(PSTR("Hold X to stop"), false);
-        return false;
-    }
 
-    // Mode-specific display
-    switch (current_mode) {
-        case MODE_CITY:
-            oled_set_cursor(0, 0);
-            oled_write_P(PSTR("City:"), false);
-            oled_set_cursor(0, 1);
+        if (is_executing) {
+            // Example: "Run Dallas x120"
+            oled_write_P(PSTR("Run "), false);
             oled_write(get_city_name(), false);
-            oled_set_cursor(0, 3);
-            oled_write_P(PSTR("Rows: "), false);
-            oled_write(itoa_simple(row_param, num_buf), false);
-            break;
-
-        case MODE_ROW:
-            oled_set_cursor(0, 0);
+            oled_write_P(PSTR(" x"), false);
+            oled_write(get_u16_str(row_param, ' '), false);
+        } else if (current_mode == MODE_CITY) {
+            // Example: "C:Dallas R:120"
+            oled_write_P(PSTR("C:"), false);
+            oled_write(get_city_name(), false);
+            oled_write_P(PSTR(" R:"), false);
+            oled_write(get_u16_str(row_param, ' '), false);
+        } else { // MODE_ROW
+            // Example while editing:  "Rows:_ S:120" or "Rows:45 S:120"
             oled_write_P(PSTR("Rows:"), false);
-            oled_set_cursor(0, 1);
             if (entry_digits == 0) {
                 oled_write_P(PSTR("_"), false);
             } else {
-                oled_write(itoa_simple(entry_buffer, num_buf), false);
+                oled_write(get_u16_str(entry_buffer, ' '), false);
             }
-            oled_set_cursor(0, 3);
-            oled_write_P(PSTR("Saved: "), false);
-            oled_write(itoa_simple(row_param, num_buf), false);
-            break;
+            oled_write_P(PSTR(" S:"), false);
+            oled_write(get_u16_str(row_param, ' '), false);
+        }
     }
 
     return false;
