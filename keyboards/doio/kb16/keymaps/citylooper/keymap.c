@@ -26,7 +26,7 @@
 
 // City names array (used for actual macro output)
 static const char* city_names[NUM_CITIES] = {
-    "Dallas",
+    "DFW",
     "San Antonio",
     "Austin",
     "Houston"
