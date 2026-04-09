@@ -15,7 +15,7 @@
 // CONSTANTS
 // ============================================================================
 
-#define NUM_CITIES 4
+#define NUM_CITIES 5
 #define MAX_ROW_DIGITS 3
 #define MAX_ROW_VALUE 999
 #define LOOP_DELAY_MS 30
@@ -29,7 +29,8 @@ static const char* city_names[NUM_CITIES] = {
     "DFW",
     "San Antonio",
     "Austin",
-    "Houston"
+    "Houston",
+    "Colorado"
 };
 
 // Short city abbreviations for the OLED (to avoid overflow)
@@ -37,7 +38,8 @@ static const char* city_abbrevs[NUM_CITIES] = {
     "DFW",   // Dallas
     "SATX",  // San Antonio
     "ATX",   // Austin
-    "HOU"    // Houston
+    "HOU",   // Houston
+    "CO"     // Colorado
 };
 
 // ============================================================================

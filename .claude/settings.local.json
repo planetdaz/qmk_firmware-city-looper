@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(clip.exe)",
+      "Bash(mkdir -p ~/.claude/session-names)",
+      "Bash(echo -n 'Add Colorado City')"
+    ]
+  }
+}
